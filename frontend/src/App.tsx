@@ -9,7 +9,15 @@ import {
   XCircle,
   Plus,
   RefreshCw,
-  Activity
+  Activity,
+  Heart,
+  Database,
+  Server,
+  Zap,
+  AlertTriangle,
+  Filter,
+  Download,
+  BarChart3
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -28,6 +36,13 @@ interface Stats {
   transactions: number;
   success_rate: number;
   avg_latency: number;
+}
+
+interface HealthStatus {
+  status: string;
+  version: string;
+  database?: string;
+  redis?: string;
 }
 
 interface Config {
@@ -56,6 +71,8 @@ function App() {
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(false);
   const [chartData, setChartData] = useState<{ time: string; value: number }[]>([]);
+  const [health, setHealth] = useState<HealthStatus | null>(null);
+  const [filter, setFilter] = useState<'all' | 'success' | 'failed'>('all');
 
   const fetchStats = useCallback(async () => {
     try {
@@ -93,10 +110,23 @@ function App() {
     }
   }, []);
 
+  const fetchHealth = useCallback(async () => {
+    try {
+      const res = await fetch('/health');
+      if (res.ok) {
+        const data = await res.json();
+        setHealth(data);
+      }
+    } catch (err) {
+      setHealth({ status: 'unhealthy', version: 'unknown' });
+    }
+  }, []);
+
   useEffect(() => {
     fetchStats();
     fetchTransactions();
     fetchConfig();
+    fetchHealth();
 
     // Generate mock chart data
     const data = [];
@@ -112,10 +142,11 @@ function App() {
     const interval = setInterval(() => {
       fetchStats();
       fetchTransactions();
+      fetchHealth();
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [fetchStats, fetchTransactions, fetchConfig]);
+  }, [fetchStats, fetchTransactions, fetchConfig, fetchHealth]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -190,7 +221,10 @@ function App() {
             chartData={chartData}
             formatCurrency={formatCurrency}
             formatTime={formatTime}
-            onRefresh={() => { fetchStats(); fetchTransactions(); }}
+            onRefresh={() => { fetchStats(); fetchTransactions(); fetchHealth(); }}
+            health={health}
+            filter={filter}
+            setFilter={setFilter}
           />
         )}
         {page === 'payment' && (
@@ -215,11 +249,64 @@ interface DashboardProps {
   formatCurrency: (amount: number) => string;
   formatTime: (dateString: string) => string;
   onRefresh: () => void;
+  health: HealthStatus | null;
+  filter: 'all' | 'success' | 'failed';
+  setFilter: (filter: 'all' | 'success' | 'failed') => void;
 }
 
-function Dashboard({ stats, transactions, chartData, formatCurrency, formatTime, onRefresh }: DashboardProps) {
+function Dashboard({ stats, transactions, chartData, formatCurrency, formatTime, onRefresh, health, filter, setFilter }: DashboardProps) {
+  const filteredTransactions = transactions.filter(txn => {
+    if (filter === 'all') return true;
+    if (filter === 'success') return txn.status === 'success';
+    return txn.status !== 'success';
+  });
+
+  const exportTransactions = () => {
+    const csv = ['ID,From,To,Amount,Status,Date'];
+    transactions.forEach(t => {
+      csv.push(`${t.id},${t.from_account},${t.to_account},${t.amount},${t.status},${t.created_at}`);
+    });
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'transactions.csv';
+    a.click();
+  };
+
   return (
     <div className="space-y-6">
+      {/* Health Status Banner */}
+      {health && (
+        <div className={`rounded-xl p-4 border flex items-center justify-between ${
+          health.status === 'healthy' 
+            ? 'bg-green-500/10 border-green-500/30' 
+            : 'bg-red-500/10 border-red-500/30'
+        }`}>
+          <div className="flex items-center space-x-3">
+            <Heart className={`w-5 h-5 ${health.status === 'healthy' ? 'text-green-400' : 'text-red-400'}`} />
+            <div>
+              <span className={health.status === 'healthy' ? 'text-green-400' : 'text-red-400'}>
+                System {health.status === 'healthy' ? 'Healthy' : 'Unhealthy'}
+              </span>
+              <span className="text-gray-500 ml-2">v{health.version}</span>
+            </div>
+          </div>
+          <div className="flex items-center space-x-4 text-sm">
+            <div className="flex items-center space-x-1">
+              <Database className="w-4 h-4 text-gray-400" />
+              <span className="text-gray-400">PostgreSQL</span>
+              <CheckCircle className="w-4 h-4 text-green-400" />
+            </div>
+            <div className="flex items-center space-x-1">
+              <Server className="w-4 h-4 text-gray-400" />
+              <span className="text-gray-400">Redis</span>
+              <CheckCircle className="w-4 h-4 text-green-400" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -284,14 +371,78 @@ function Dashboard({ stats, transactions, chartData, formatCurrency, formatTime,
         </div>
       </div>
 
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <QuickActionCard
+          icon={<Zap className="w-5 h-5" />}
+          label="Generate Load"
+          onClick={() => {
+            for (let i = 0; i < 5; i++) {
+              fetch(`${API_BASE}/transactions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  from_account: `ACC-${1000 + Math.floor(Math.random() * 10)}`,
+                  to_account: `ACC-${2000 + Math.floor(Math.random() * 10)}`,
+                  amount: Math.floor(Math.random() * 1000) + 10,
+                  description: 'Load test transaction'
+                })
+              });
+            }
+            setTimeout(onRefresh, 500);
+          }}
+        />
+        <QuickActionCard
+          icon={<BarChart3 className="w-5 h-5" />}
+          label="View Metrics"
+          onClick={() => window.open('/metrics', '_blank')}
+        />
+        <QuickActionCard
+          icon={<Download className="w-5 h-5" />}
+          label="Export CSV"
+          onClick={exportTransactions}
+        />
+        <QuickActionCard
+          icon={<AlertTriangle className="w-5 h-5" />}
+          label="Trigger Error"
+          onClick={async () => {
+            await fetch(`${API_BASE}/transactions`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                from_account: 'INVALID',
+                to_account: 'INVALID',
+                amount: -1,
+                description: 'Error test'
+              })
+            });
+            onRefresh();
+          }}
+        />
+      </div>
+
       {/* Recent Transactions */}
       <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-        <h2 className="text-lg font-semibold mb-4">Recent Transactions</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">Recent Transactions</h2>
+          <div className="flex items-center space-x-2">
+            <Filter className="w-4 h-4 text-gray-400" />
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as 'all' | 'success' | 'failed')}
+              className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="all">All</option>
+              <option value="success">Success</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+        </div>
         <div className="space-y-3">
-          {transactions.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No transactions yet</p>
+          {filteredTransactions.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">No transactions found</p>
           ) : (
-            transactions.slice(0, 10).map((txn) => (
+            filteredTransactions.slice(0, 10).map((txn) => (
               <div
                 key={txn.id}
                 className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg"
@@ -331,7 +482,7 @@ interface StatCardProps {
 
 function StatCard({ title, value, icon, color }: StatCardProps) {
   return (
-    <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+    <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-gray-600 transition">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-gray-400 text-sm">{title}</p>
@@ -342,6 +493,26 @@ function StatCard({ title, value, icon, color }: StatCardProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+interface QuickActionCardProps {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}
+
+function QuickActionCard({ icon, label, onClick }: QuickActionCardProps) {
+  return (
+    <button
+      onClick={onClick}
+      className="bg-gray-800 rounded-xl p-4 border border-gray-700 hover:border-purple-500 hover:bg-gray-700/50 transition flex items-center space-x-3"
+    >
+      <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400">
+        {icon}
+      </div>
+      <span className="font-medium">{label}</span>
+    </button>
   );
 }
 
