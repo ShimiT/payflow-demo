@@ -1,0 +1,24 @@
+# Buggy Configuration - For incident simulation
+backend:
+  image:
+    tag: "v1.1.0-hotfix"
+  resources:
+    limits:
+      memory: "128Mi"  # Lower limit to trigger OOM faster
+
+config:
+  cacheMaxSize: "500MB"      # Causes OOM
+  cacheTTL: "7200"
+  dbPoolSize: "25"
+  rateLimitRPS: "1000"
+  logLevel: "debug"
+  featureNewCache: "true"    # Buggy feature
+
+bugInjection:
+  enabled: true
+  oom: true
+  latencyMs: 0
+  errorRate: 0
+  cpuBurn: false
+  panic: false
+  dbTimeout: false

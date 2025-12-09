@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "payflow.fullname" . }}-config
+  labels:
+    {{- include "payflow.labels" . | nindent 4 }}
+data:
+  CACHE_MAX_SIZE: {{ .Values.config.cacheMaxSize | quote }}
+  CACHE_TTL: {{ .Values.config.cacheTTL | quote }}
+  DB_POOL_SIZE: {{ .Values.config.dbPoolSize | quote }}
+  RATE_LIMIT_RPS: {{ .Values.config.rateLimitRPS | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  FEATURE_NEW_CACHE: {{ .Values.config.featureNewCache | quote }}
+  # Bug injection settings
+  INJECT_OOM: {{ .Values.bugInjection.oom | quote }}
+  INJECT_LATENCY_MS: {{ .Values.bugInjection.latencyMs | quote }}
+  INJECT_ERROR_RATE: {{ .Values.bugInjection.errorRate | quote }}
+  INJECT_CPU_BURN: {{ .Values.bugInjection.cpuBurn | quote }}
+  INJECT_PANIC: {{ .Values.bugInjection.panic | quote }}
+  INJECT_DB_TIMEOUT: {{ .Values.bugInjection.dbTimeout | quote }}

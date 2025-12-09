@@ -1,0 +1,13 @@
+apiVersion: v2
+name: payflow
+description: Payment Processing Demo for InfraSage RCA
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+maintainers:
+  - name: InfraSage
+    email: demo@infrasage.io
+keywords:
+  - payment
+  - demo
+  - rca

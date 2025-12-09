@@ -1,0 +1,114 @@
+# Default values for payflow - Known Good Configuration
+replicaCount: 1
+
+backend:
+  image:
+    repository: payflow-backend
+    tag: "v1.0.0"
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+  service:
+    type: ClusterIP
+    port: 8080
+
+frontend:
+  image:
+    repository: payflow-frontend
+    tag: "v1.0.0"
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+  service:
+    type: ClusterIP
+    port: 80
+
+# Application configuration
+config:
+  cacheMaxSize: "100MB"
+  cacheTTL: "3600"
+  dbPoolSize: "10"
+  rateLimitRPS: "100"
+  logLevel: "info"
+  featureNewCache: "false"
+
+# Bug injection settings
+bugInjection:
+  enabled: false
+  oom: false
+  latencyMs: 0
+  errorRate: 0
+  cpuBurn: false
+  panic: false
+  dbTimeout: false
+
+# PostgreSQL configuration
+postgresql:
+  enabled: true
+  auth:
+    username: payflow
+    password: payflow123
+    database: payflow
+  primary:
+    persistence:
+      enabled: false
+    resources:
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+
+# Redis configuration
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false
+    resources:
+      limits:
+        cpu: "200m"
+        memory: "128Mi"
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+  hosts:
+    - host: payflow.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Service account
+serviceAccount:
+  create: true
+  name: ""
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Prometheus ServiceMonitor
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s

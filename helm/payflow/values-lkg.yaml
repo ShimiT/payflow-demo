@@ -1,0 +1,21 @@
+# Last Known Good Configuration - Stable v1.0.0
+backend:
+  image:
+    tag: "v1.0.0"
+
+config:
+  cacheMaxSize: "100MB"
+  cacheTTL: "3600"
+  dbPoolSize: "10"
+  rateLimitRPS: "100"
+  logLevel: "info"
+  featureNewCache: "false"
+
+bugInjection:
+  enabled: false
+  oom: false
+  latencyMs: 0
+  errorRate: 0
+  cpuBurn: false
+  panic: false
+  dbTimeout: false
