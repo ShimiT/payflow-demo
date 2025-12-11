@@ -80,9 +80,9 @@ submit-buggy:
 	@git add VERSION helm/payflow/Chart.yaml
 	@git commit -m "chore: prepare buggy release $(CHART_VERSION_BUGGY)" || echo "No changes to commit"
 	@git push -u origin bug/oom-demo-$(CHART_VERSION_BUGGY)
-	@if command -v gh >/dev/null 2>&1; then \
+	@if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then \
 		gh pr create --title "chore: submit buggy release $(CHART_VERSION_BUGGY)" --body "Prep buggy OOM demo release $(CHART_VERSION_BUGGY) (app $(APP_VERSION_BUGGY)): updates VERSION and chart metadata for the RCA incident simulation."; \
 	else \
-		echo "gh not found; open PR manually:"; \
+		echo "Open PR manually (gh missing or not authenticated):"; \
 		echo "https://github.com/$(REPO)/compare/main...bug/oom-demo-$(CHART_VERSION_BUGGY)?expand=1"; \
 	fi
