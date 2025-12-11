@@ -9,7 +9,8 @@ CHART_VERSION_BUGGY := 0.0.2
 RELEASE_DIR := dist
 # Extract "owner/repo" from origin URL without using regex groups (to keep make happy)
 # Extract owner/repo from origin URL (supports git@ and https://)
-REPO := $(or $(shell git config --get remote.origin.url | awk -F'[:/]' '{print $(NF-1)"/"$(NF)}' | sed 's/\.git$$//'),ShimiT/payflow-demo)
+REPO_RAW := $(shell git config --get remote.origin.url | awk -F'[:/]' '{print $(NF-1)"/"$(NF)}' | sed 's/\.git$$//')
+REPO := $(if $(strip $(REPO_RAW)),$(strip $(REPO_RAW)),ShimiT/payflow-demo)
 
 # Deploy the application to k3d cluster
 deploy:
