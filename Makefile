@@ -9,9 +9,6 @@ CHART_VERSION_BUGGY := 0.0.2
 RELEASE_DIR := dist
 # Extract "owner/repo" from origin URL without using regex groups (to keep make happy)
 # Extract owner/repo from origin URL (supports git@ and https://)
-REPO_RAW := $(shell git config --get remote.origin.url | awk -F'[:/]' '{print $(NF-1)"/"$(NF)}' | sed 's/\.git$$//')
-REPO := $(if $(strip $(REPO_RAW)),$(strip $(REPO_RAW)),ShimiT/payflow-demo)
-
 # Deploy the application to k3d cluster
 deploy:
 	@echo "Creating namespace $(NAMESPACE) if not exists..."
@@ -85,5 +82,7 @@ submit-buggy:
 		gh pr create --title "chore: submit buggy release $(CHART_VERSION_BUGGY)" --body "Prep buggy OOM demo release $(CHART_VERSION_BUGGY) (app $(APP_VERSION_BUGGY)): updates VERSION and chart metadata for the RCA incident simulation."; \
 	else \
 		echo "Open PR manually (gh missing or not authenticated):"; \
-		echo "https://github.com/$(REPO)/compare/main...bug/oom-demo-$(CHART_VERSION_BUGGY)?expand=1"; \
+		repo=$$(git config --get remote.origin.url | awk -F'[:/]' '{print $$(NF-1)"/"$$NF}' | sed 's/\.git$$//'); \
+		[ -z "$$repo" ] && repo="ShimiT/payflow-demo"; \
+		echo "https://github.com/$$repo/compare/main...bug/oom-demo-$(CHART_VERSION_BUGGY)?expand=1"; \
 	fi
