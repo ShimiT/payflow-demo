@@ -30,6 +30,7 @@ help:
 	@echo "  make demo-check       Verify all prerequisites are installed"
 	@echo ""
 	@echo "=== DEMO FLOW (use these for the demo) ==="
+	@echo "  make demo-baseline    Phase 1: Build + import + deploy stable baseline"
 	@echo "  make demo-stable      Commit stable code + build + deploy"
 	@echo "  make demo-buggy       Commit buggy code + build + deploy"
 	@echo "  make demo-rca         Start RCA investigation via API"
@@ -152,6 +153,33 @@ commit-buggy:
 # =============================================================================
 # DEMO FLOW TARGETS
 # =============================================================================
+
+demo-baseline:
+	@echo "=============================================="
+	@echo "  Phase 1: Deploy Stable Baseline"
+	@echo "=============================================="
+	@echo ""
+	@echo "Current VERSION: $(VERSION)"
+	@echo ""
+	@echo "Step 1/3: Building Docker images..."
+	@$(MAKE) build
+	@echo ""
+	@echo "Step 2/3: Importing to k3d cluster..."
+	@$(MAKE) import
+	@echo ""
+	@echo "Step 3/3: Deploying to Kubernetes..."
+	@$(MAKE) deploy
+	@echo ""
+	@echo "=== BASELINE DEPLOYMENT COMPLETE ==="
+	@echo "Version: $(VERSION)"
+	@echo ""
+	@kubectl get pods -n $(NAMESPACE)
+	@echo ""
+	@echo "Next Steps:"
+	@echo "  1. Configure InfraSage tracking (UI: http://localhost:3011)"
+	@echo "  2. Add Git mapping: payflow-* -> ShimiT/payflow-demo"
+	@echo "  3. Wait 30s for tracking to pick up deployments"
+	@echo "  4. Run 'make demo-buggy' to introduce the bug"
 
 demo-stable:
 	@echo "=============================================="
