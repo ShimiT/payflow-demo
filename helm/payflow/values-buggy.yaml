@@ -1,7 +1,5 @@
 # Buggy Configuration - For incident simulation
 backend:
-  image:
-    tag: "v1.1.0-hotfix"
   resources:
     limits:
       memory: "128Mi"  # Lower limit to trigger OOM faster

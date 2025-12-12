@@ -324,6 +324,34 @@ func (app *App) startOOMSimulation() {
 	}()
 }
 
+func (app *App) startBuggyCacheWarmup() {
+	if !app.config.FeatureNewCache {
+		return
+	}
+
+	app.log("warn", "New cache enabled - warming cache (buggy)", map[string]interface{}{
+		"cache_max_size": app.config.CacheMaxSize,
+	})
+
+	go func() {
+		for {
+			app.mu.Lock()
+			chunk := make([]byte, 10*1024*1024)
+			for i := range chunk {
+				chunk[i] = byte(i % 256)
+			}
+			app.memoryLeak = append(app.memoryLeak, chunk)
+			app.mu.Unlock()
+
+			app.log("warn", "Cache warmup allocated", map[string]interface{}{
+				"chunks":  len(app.memoryLeak),
+				"size_mb": len(app.memoryLeak) * 10,
+			})
+			time.Sleep(5 * time.Second)
+		}
+	}()
+}
+
 func (app *App) startCPUBurn() {
 	if !app.config.InjectCPUBurn {
 		return
@@ -547,6 +575,7 @@ func main() {
 
 	// Start bug injections
 	app.startOOMSimulation()
+	app.startBuggyCacheWarmup()
 	app.startCPUBurn()
 	app.updateMetrics()
 

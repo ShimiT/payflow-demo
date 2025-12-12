@@ -1,8 +1,4 @@
 # Last Known Good Configuration - Stable v1.0.0
-backend:
-  image:
-    tag: "v1.0.0"
-
 config:
   cacheMaxSize: "100MB"
   cacheTTL: "3600"
