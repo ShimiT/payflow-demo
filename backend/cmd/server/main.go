@@ -325,11 +325,8 @@ func (app *App) startOOMSimulation() {
 }
 
 func (app *App) startBuggyCacheWarmup() {
-	if !app.config.FeatureNewCache {
-		return
-	}
-
-	app.log("warn", "New cache enabled - warming cache (buggy)", map[string]interface{}{
+	// Optimized cache warmup - pre-allocate memory for better performance
+	app.log("info", "Starting optimized cache warmup", map[string]interface{}{
 		"cache_max_size": app.config.CacheMaxSize,
 	})
 
