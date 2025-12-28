@@ -3,6 +3,7 @@ replicaCount: 1
 
 backend:
   image:
+    registry: "localhost:5111"
     repository: payflow-backend
     tag: ""
     pullPolicy: IfNotPresent
@@ -19,6 +20,7 @@ backend:
 
 frontend:
   image:
+    registry: "localhost:5111"
     repository: payflow-frontend
     tag: ""
     pullPolicy: IfNotPresent
