@@ -1,0 +1,7 @@
+mirrors:
+  "k3d-payflow-registry:5000":
+    endpoint:
+      - "http://k3d-payflow-registry:5000"
+  "localhost:5111":
+    endpoint:
+      - "http://k3d-payflow-registry:5000"

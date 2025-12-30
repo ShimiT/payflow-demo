@@ -17,6 +17,7 @@ CLUSTER_NAME ?= k3d-kubeiq-test-cluster
 
 .PHONY: help version sync-main build build-images import import-images deploy deploy-buggy deploy-lkg remove status logs port-forward
 .PHONY: demo-check demo-commit demo-stable demo-buggy demo-rca demo-rollback demo-watch demo-events demo-full demo-reset wait-for-ci helm-check
+.PHONY: release-buggy deploy-buggy-release release-stable deploy-stable-release
 
 # =============================================================================
 # HELP
@@ -55,6 +56,12 @@ help:
 	@echo "  make sync-main        Fetch and checkout main branch"
 	@echo "  make commit-stable    Commit code without bug (direct to main)"
 	@echo "  make commit-buggy     Commit code with bug (direct to main)"
+	@echo ""
+	@echo "=== RELEASE (Real-World Flow) ==="
+	@echo "  make release-buggy         Create buggy release (bump version + tag + push)"
+	@echo "  make deploy-buggy-release  Build + import + deploy the buggy release"
+	@echo "  make release-stable        Create stable release (revert bug + bump version + tag)"
+	@echo "  make deploy-stable-release Build + import + deploy the stable release"
 	@echo ""
 	@echo "=== INFO ==="
 	@echo "  make version          Show current VERSION"
@@ -149,6 +156,116 @@ commit-buggy:
 	else \
 		echo "Bug patch already applied or cannot apply. Skipping."; \
 	fi
+
+# =============================================================================
+# RELEASE TARGETS (Real-World Flow with Version Bump + Git Tag)
+# =============================================================================
+
+release-buggy:
+	@echo "=============================================="
+	@echo "  Creating Buggy Release"
+	@echo "=============================================="
+	@git fetch origin && git pull origin main
+	@CURRENT=$$(cat VERSION); \
+	MAJOR=$$(echo $$CURRENT | cut -d. -f1); \
+	MINOR=$$(echo $$CURRENT | cut -d. -f2); \
+	PATCH=$$(echo $$CURRENT | cut -d. -f3); \
+	NEW_PATCH=$$((PATCH + 1)); \
+	NEW_VERSION="$$MAJOR.$$MINOR.$$NEW_PATCH"; \
+	echo "Bumping version: $$CURRENT -> $$NEW_VERSION"; \
+	echo "$$NEW_VERSION" > VERSION; \
+	sed -i '' "s/version: $$CURRENT/version: $$NEW_VERSION/" helm/payflow/Chart.yaml; \
+	sed -i '' "s/appVersion: \"$$CURRENT\"/appVersion: \"$$NEW_VERSION\"/" helm/payflow/Chart.yaml; \
+	if git apply --check scripts/demo/bug.patch 2>/dev/null; then \
+		git apply scripts/demo/bug.patch; \
+		echo "Bug patch applied"; \
+	else \
+		echo "Bug patch already applied or cannot apply"; \
+	fi; \
+	git add -A; \
+	git commit -m "feat: v$$NEW_VERSION - enable new cache warmup feature"; \
+	git tag "v$$NEW_VERSION"; \
+	git push origin main --tags; \
+	echo ""; \
+	echo "=== RELEASE CREATED ==="; \
+	echo "Version: v$$NEW_VERSION"; \
+	echo "Tag pushed: v$$NEW_VERSION (triggers webhook -> Code RAG indexing)"; \
+	echo ""; \
+	echo "Next: make deploy-buggy-release"
+
+deploy-buggy-release:
+	@echo "=============================================="
+	@echo "  Deploying Buggy Release"
+	@echo "=============================================="
+	@echo "Version: $(VERSION)"
+	@echo ""
+	@echo "Step 1/3: Building Docker images..."
+	@$(MAKE) build
+	@echo ""
+	@echo "Step 2/3: Importing images to k3d..."
+	@$(MAKE) import
+	@echo ""
+	@echo "Step 3/3: Deploying with buggy config..."
+	@$(MAKE) deploy-buggy
+	@echo ""
+	@echo "=== BUGGY RELEASE DEPLOYED ==="
+	@echo "Version: $(VERSION)"
+	@echo ""
+	@kubectl get pods -n $(NAMESPACE)
+	@echo ""
+	@echo "Watch for OOM crashes: make demo-watch"
+
+release-stable:
+	@echo "=============================================="
+	@echo "  Creating Stable Release (Revert Bug)"
+	@echo "=============================================="
+	@git fetch origin && git pull origin main
+	@CURRENT=$$(cat VERSION); \
+	MAJOR=$$(echo $$CURRENT | cut -d. -f1); \
+	MINOR=$$(echo $$CURRENT | cut -d. -f2); \
+	PATCH=$$(echo $$CURRENT | cut -d. -f3); \
+	NEW_PATCH=$$((PATCH + 1)); \
+	NEW_VERSION="$$MAJOR.$$MINOR.$$NEW_PATCH"; \
+	echo "Bumping version: $$CURRENT -> $$NEW_VERSION"; \
+	echo "$$NEW_VERSION" > VERSION; \
+	sed -i '' "s/version: $$CURRENT/version: $$NEW_VERSION/" helm/payflow/Chart.yaml; \
+	sed -i '' "s/appVersion: \"$$CURRENT\"/appVersion: \"$$NEW_VERSION\"/" helm/payflow/Chart.yaml; \
+	if git apply --check -R scripts/demo/bug.patch 2>/dev/null; then \
+		git apply -R scripts/demo/bug.patch; \
+		echo "Bug patch reverted"; \
+	else \
+		echo "Bug patch already reverted or cannot apply"; \
+	fi; \
+	git add -A; \
+	git commit -m "fix: v$$NEW_VERSION - revert buggy cache warmup"; \
+	git tag "v$$NEW_VERSION"; \
+	git push origin main --tags; \
+	echo ""; \
+	echo "=== STABLE RELEASE CREATED ==="; \
+	echo "Version: v$$NEW_VERSION"; \
+	echo "Tag pushed: v$$NEW_VERSION (triggers webhook -> Code RAG indexing)"; \
+	echo ""; \
+	echo "Next: make deploy-stable-release"
+
+deploy-stable-release:
+	@echo "=============================================="
+	@echo "  Deploying Stable Release"
+	@echo "=============================================="
+	@echo "Version: $(VERSION)"
+	@echo ""
+	@echo "Step 1/3: Building Docker images..."
+	@$(MAKE) build
+	@echo ""
+	@echo "Step 2/3: Importing images to k3d..."
+	@$(MAKE) import
+	@echo ""
+	@echo "Step 3/3: Deploying stable version..."
+	@$(MAKE) deploy
+	@echo ""
+	@echo "=== STABLE RELEASE DEPLOYED ==="
+	@echo "Version: $(VERSION)"
+	@echo ""
+	@kubectl get pods -n $(NAMESPACE)
 
 # =============================================================================
 # DEMO FLOW TARGETS
@@ -330,8 +447,8 @@ sync-main:
 build: build-images
 
 build-images:
-	docker build --build-arg GIT_SHA=$(GIT_SHA) -t $(BACKEND_IMAGE):$(VERSION) ./backend
-	docker build --build-arg GIT_SHA=$(GIT_SHA) -t $(FRONTEND_IMAGE):$(VERSION) ./frontend
+	docker build --build-arg GIT_SHA=$(GIT_SHA) --build-arg VERSION=$(VERSION) -t $(BACKEND_IMAGE):$(VERSION) ./backend
+	docker build --build-arg GIT_SHA=$(GIT_SHA) --build-arg VERSION=$(VERSION) -t $(FRONTEND_IMAGE):$(VERSION) ./frontend
 
 import: import-images
 
