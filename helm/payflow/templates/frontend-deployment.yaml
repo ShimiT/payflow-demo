@@ -17,7 +17,7 @@ spec:
       serviceAccountName: {{ include "payflow.serviceAccountName" . }}
       containers:
         - name: frontend
-          image: "{{ .Values.frontend.image.registry }}/{{ .Values.frontend.image.repository }}:{{ default .Chart.AppVersion .Values.frontend.image.tag }}"
+          image: "{{- if .Values.frontend.image.registry }}{{ .Values.frontend.image.registry }}/{{- end }}{{ .Values.frontend.image.repository }}:{{ default .Chart.AppVersion .Values.frontend.image.tag }}"
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
           ports:
             - name: http
