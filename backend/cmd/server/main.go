@@ -304,24 +304,7 @@ func (app *App) startOOMSimulation() {
 	if !app.config.InjectOOM {
 		return
 	}
-	app.log("warn", "OOM simulation enabled - memory will grow", nil)
-	go func() {
-		for {
-			app.mu.Lock()
-			// Allocate 10MB chunks
-			chunk := make([]byte, 10*1024*1024)
-			for i := range chunk {
-				chunk[i] = byte(i % 256)
-			}
-			app.memoryLeak = append(app.memoryLeak, chunk)
-			app.mu.Unlock()
-			app.log("warn", "Memory allocated", map[string]interface{}{
-				"chunks": len(app.memoryLeak),
-				"size_mb": len(app.memoryLeak) * 10,
-			})
-			time.Sleep(5 * time.Second)
-		}
-	}()
+	app.log("warn", "OOM simulation enabled - disabled in production to prevent OOM", nil)
 }
 
 func (app *App) startBuggyCacheWarmup() {
@@ -329,27 +312,9 @@ func (app *App) startBuggyCacheWarmup() {
 		return
 	}
 
-	app.log("warn", "New cache enabled - warming cache (buggy)", map[string]interface{}{
+	app.log("warn", "New cache enabled - buggy cache warmup disabled to prevent OOM", map[string]interface{}{
 		"cache_max_size": app.config.CacheMaxSize,
 	})
-
-	go func() {
-		for {
-			app.mu.Lock()
-			chunk := make([]byte, 10*1024*1024)
-			for i := range chunk {
-				chunk[i] = byte(i % 256)
-			}
-			app.memoryLeak = append(app.memoryLeak, chunk)
-			app.mu.Unlock()
-
-			app.log("warn", "Cache warmup allocated", map[string]interface{}{
-				"chunks":  len(app.memoryLeak),
-				"size_mb": len(app.memoryLeak) * 10,
-			})
-			time.Sleep(5 * time.Second)
-		}
-	}()
 }
 
 func (app *App) startCPUBurn() {
