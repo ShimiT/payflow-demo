@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -308,7 +309,15 @@ func (app *App) startOOMSimulation() {
 	go func() {
 		for {
 			app.mu.Lock()
-			// Allocate 10MB chunks
+			maxChunks := parseMaxChunks(app.config.CacheMaxSize)
+			if maxChunks > 0 && len(app.memoryLeak) >= maxChunks {
+				app.mu.Unlock()
+				app.log("warn", "OOM simulation reached max chunks, stopping", map[string]interface{}{
+					"chunks":  len(app.memoryLeak),
+					"size_mb": len(app.memoryLeak) * 10,
+				})
+				return
+			}
 			chunk := make([]byte, 10*1024*1024)
 			for i := range chunk {
 				chunk[i] = byte(i % 256)
@@ -316,7 +325,7 @@ func (app *App) startOOMSimulation() {
 			app.memoryLeak = append(app.memoryLeak, chunk)
 			app.mu.Unlock()
 			app.log("warn", "Memory allocated", map[string]interface{}{
-				"chunks": len(app.memoryLeak),
+				"chunks":  len(app.memoryLeak),
 				"size_mb": len(app.memoryLeak) * 10,
 			})
 			time.Sleep(5 * time.Second)
@@ -469,6 +478,35 @@ func (app *App) getTransactionsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, transactions)
 }
 
+func parseMaxChunks(cacheMaxSize string) int {
+	if cacheMaxSize == "" {
+		return 0
+	}
+	v := strings.TrimSpace(strings.ToUpper(cacheMaxSize))
+	multiplier := 1
+	if strings.HasSuffix(v, "KB") {
+		multiplier = 1024
+		v = strings.TrimSpace(strings.TrimSuffix(v, "KB"))
+	} else if strings.HasSuffix(v, "MB") {
+		multiplier = 1024 * 1024
+		v = strings.TrimSpace(strings.TrimSuffix(v, "MB"))
+	} else if strings.HasSuffix(v, "GB") {
+		multiplier = 1024 * 1024 * 1024
+		v = strings.TrimSpace(strings.TrimSuffix(v, "GB"))
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return 0
+	}
+	bytes := n * multiplier
+	chunkSize := 10 * 1024 * 1024
+	chunks := bytes / chunkSize
+	if chunks <= 0 {
+		chunks = 1
+	}
+	return chunks
+}
+
 func (app *App) createTransactionHandler(c *gin.Context) {
 	var req struct {
 		FromAccount string  `json:"from_account" binding:"required"`
@@ -589,7 +627,7 @@ func main() {
 		AllowHeaders:     []string{"*"},
 		AllowCredentials: true,
 	}))
-	r.Use(app.metricsMiddleware())
+	 r.Use(app.metricsMiddleware())
 	r.Use(app.bugInjectionMiddleware())
 
 	// Routes
