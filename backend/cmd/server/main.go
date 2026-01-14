@@ -106,13 +106,14 @@ type Transaction struct {
 
 // App holds application state
 type App struct {
-	config      *Config
-	db          *sql.DB
-	redisClient *redis.Client
-	memoryLeak  [][]byte
-	mu          sync.Mutex
-	cacheHits   int64
-	cacheMisses int64
+	config        *Config
+	db            *sql.DB
+	redisClient   *redis.Client
+	fraudDetector *FraudDetector
+	memoryLeak    [][]byte
+	mu            sync.Mutex
+	cacheHits     int64
+	cacheMisses   int64
 }
 
 // StructuredLog represents a JSON log entry
@@ -232,6 +233,11 @@ func (app *App) initDB() error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create tables: %w", err)
+	}
+
+	// Create fraud detection tables
+	if err := InitFraudTables(app.db); err != nil {
+		return fmt.Errorf("failed to create fraud tables: %w", err)
 	}
 
 	app.log("info", "Database initialized", nil)
@@ -514,6 +520,14 @@ func (app *App) createTransactionHandler(c *gin.Context) {
 		if err != nil {
 			app.log("error", "Failed to save transaction", map[string]interface{}{"error": err.Error()})
 		}
+
+		// Run fraud detection
+		if err := app.fraudDetector.AnalyzeTransaction(&txn); err != nil {
+			app.log("error", "Fraud detection failed", map[string]interface{}{
+				"transaction_id": txn.ID,
+				"error":          err.Error(),
+			})
+		}
 	}
 
 	app.log("info", "Transaction processed", map[string]interface{}{
@@ -572,6 +586,12 @@ func main() {
 	if err := app.initRedis(); err != nil {
 		app.log("warn", "Redis initialization failed", map[string]interface{}{"error": err.Error()})
 	}
+
+	// Initialize fraud detector
+	app.fraudDetector = NewFraudDetector(app.db, config)
+	app.log("info", "Fraud detection initialized", map[string]interface{}{
+		"enabled": app.fraudDetector.enabled,
+	})
 
 	// Start bug injections
 	app.startOOMSimulation()

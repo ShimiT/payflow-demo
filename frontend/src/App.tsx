@@ -17,9 +17,11 @@ import {
   AlertTriangle,
   Filter,
   Download,
-  BarChart3
+  BarChart3,
+  Shield
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import FraudDetection from './components/FraudDetection';
 
 interface Transaction {
   id: string;
@@ -65,7 +67,7 @@ interface Config {
 const API_BASE = '/api';
 
 function App() {
-  const [page, setPage] = useState<'dashboard' | 'payment' | 'settings'>('dashboard');
+  const [page, setPage] = useState<'dashboard' | 'payment' | 'settings' | 'fraud'>('dashboard');
   const [stats, setStats] = useState<Stats>({ revenue: 0, transactions: 0, success_rate: 0, avg_latency: 0 });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
@@ -199,6 +201,15 @@ function App() {
                 <span>Payment</span>
               </button>
               <button
+                onClick={() => setPage('fraud')}
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition ${
+                  page === 'fraud' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                <span>Fraud</span>
+              </button>
+              <button
                 onClick={() => setPage('settings')}
                 className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition ${
                   page === 'settings' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
@@ -233,6 +244,9 @@ function App() {
             loading={loading}
             setLoading={setLoading}
           />
+        )}
+        {page === 'fraud' && (
+          <FraudDetection />
         )}
         {page === 'settings' && (
           <SettingsPage config={config} onRefresh={fetchConfig} />
