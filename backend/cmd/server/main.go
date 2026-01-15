@@ -304,11 +304,20 @@ func (app *App) startOOMSimulation() {
 	if !app.config.InjectOOM {
 		return
 	}
-	app.log("warn", "OOM simulation enabled - memory will grow", nil)
+	app.log("warn", "OOM simulation enabled - bounded memory growth", nil)
 	go func() {
+		maxChunks := 10
 		for {
 			app.mu.Lock()
-			// Allocate 10MB chunks
+			if len(app.memoryLeak) >= maxChunks {
+				app.mu.Unlock()
+				app.log("warn", "OOM simulation at max chunks", map[string]interface{}{
+					"chunks":  len(app.memoryLeak),
+					"size_mb": len(app.memoryLeak) * 10,
+				})
+				time.Sleep(5 * time.Second)
+				continue
+			}
 			chunk := make([]byte, 10*1024*1024)
 			for i := range chunk {
 				chunk[i] = byte(i % 256)
@@ -329,13 +338,23 @@ func (app *App) startBuggyCacheWarmup() {
 		return
 	}
 
-	app.log("warn", "New cache enabled - warming cache (buggy)", map[string]interface{}{
+	app.log("warn", "New cache enabled - warming cache (bounded)", map[string]interface{}{
 		"cache_max_size": app.config.CacheMaxSize,
 	})
 
 	go func() {
+		maxChunks := 10
 		for {
 			app.mu.Lock()
+			if len(app.memoryLeak) >= maxChunks {
+				app.mu.Unlock()
+				app.log("warn", "Cache warmup at max chunks", map[string]interface{}{
+					"chunks":  len(app.memoryLeak),
+					"size_mb": len(app.memoryLeak) * 10,
+				})
+				time.Sleep(5 * time.Second)
+				continue
+			}
 			chunk := make([]byte, 10*1024*1024)
 			for i := range chunk {
 				chunk[i] = byte(i % 256)
