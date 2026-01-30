@@ -125,6 +125,50 @@ type StructuredLog struct {
 	Data      interface{} `json:"data,omitempty"`
 }
 
+// TransactionService provides abstracted database operations for transactions
+type TransactionService struct {
+	db *sql.DB
+}
+
+func NewTransactionService(db *sql.DB) *TransactionService {
+	return &TransactionService{db: db}
+}
+
+func (s *TransactionService) GetByStatus(status string) ([]Transaction, error) {
+	query := `SELECT id, from_account, to_account, amount, description, status, created_at
+              FROM transactions WHERE status = $1 ORDER BY created_at DESC`
+	rows, err := s.db.Query(query, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var transactions []Transaction
+	for rows.Next() {
+		var t Transaction
+		if err := rows.Scan(&t.ID, &t.FromAccount, &t.ToAccount, &t.Amount,
+			&t.Description, &t.Status, &t.CreatedAt); err != nil {
+			continue
+		}
+		transactions = append(transactions, t)
+	}
+	return transactions, nil
+}
+
+func (s *TransactionService) GetSummary() (map[string]interface{}, error) {
+	var completed, pending, failed int
+	s.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE status = 'success'`).Scan(&completed)
+	s.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE status = 'pending'`).Scan(&pending)
+	s.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE status = 'failed'`).Scan(&failed)
+
+	return map[string]interface{}{
+		"completed": completed,
+		"pending":   pending,
+		"failed":    failed,
+		"total":     completed + pending + failed,
+	}, nil
+}
+
 func (app *App) log(level, message string, data interface{}) {
 	logEntry := StructuredLog{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
@@ -544,6 +588,78 @@ func (app *App) getConfigHandler(c *gin.Context) {
 	})
 }
 
+func (app *App) diagnosticsHandler(c *gin.Context) {
+	log.Printf("[DIAGNOSTICS] Request received from %s", c.ClientIP())
+
+	var dbStats struct {
+		OpenConnections int `json:"open_connections"`
+		InUse           int `json:"in_use"`
+		Idle            int `json:"idle"`
+	}
+
+	if app.db != nil {
+		stats := app.db.Stats()
+		dbStats.OpenConnections = stats.OpenConnections
+		dbStats.InUse = stats.InUse
+		dbStats.Idle = stats.Idle
+		log.Printf("[DIAGNOSTICS] DB connections: open=%d, in_use=%d, idle=%d",
+			dbStats.OpenConnections, dbStats.InUse, dbStats.Idle)
+	}
+
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	log.Printf("[DIAGNOSTICS] Memory: alloc=%d MB, sys=%d MB",
+		memStats.Alloc/1024/1024, memStats.Sys/1024/1024)
+
+	c.JSON(http.StatusOK, gin.H{
+		"db_connections": dbStats,
+		"memory": gin.H{
+			"alloc_mb": memStats.Alloc / 1024 / 1024,
+			"sys_mb":   memStats.Sys / 1024 / 1024,
+		},
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
+}
+
+func (app *App) getTransactionSummaryHandler(c *gin.Context) {
+	if app.db == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "database not available"})
+		return
+	}
+
+	service := NewTransactionService(app.db)
+	summary, err := service.GetSummary()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, summary)
+}
+
+func (app *App) getTransactionsByStatusHandler(c *gin.Context) {
+	if app.db == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "database not available"})
+		return
+	}
+
+	status := c.Query("status")
+	if status == "" {
+		status = "pending"
+	}
+
+	service := NewTransactionService(app.db)
+	transactions, err := service.GetByStatus(status)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if transactions == nil {
+		transactions = []Transaction{}
+	}
+	c.JSON(http.StatusOK, transactions)
+}
+
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
@@ -603,6 +719,9 @@ func main() {
 		api.GET("/transactions", app.getTransactionsHandler)
 		api.POST("/transactions", app.createTransactionHandler)
 		api.GET("/config", app.getConfigHandler)
+		api.GET("/diagnostics", app.diagnosticsHandler)
+		api.GET("/transactions/summary", app.getTransactionSummaryHandler)
+		api.GET("/transactions/by-status", app.getTransactionsByStatusHandler)
 	}
 
 	// Graceful shutdown
