@@ -20,7 +20,7 @@ spec:
       serviceAccountName: {{ include "payflow.serviceAccountName" . }}
       containers:
         - name: backend
-          image: "{{- if .Values.backend.image.registry }}{{ .Values.backend.image.registry }}/{{- end }}{{ .Values.backend.image.repository }}:{{ default .Chart.AppVersion .Values.backend.image.tag }}"
+          image: "{{- if .Values.backend.image.registry }}{{ .Values.backend.image.registry }}/{{- end }}{{ .Values.backend.image.repository }}:{{ default .Chart.AppVersion .Values.backend.image.tag | quote }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
           ports:
             - name: http
