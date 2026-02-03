@@ -306,13 +306,12 @@ func (app *App) startOOMSimulation() {
 	}
 	app.log("warn", "OOM simulation enabled - memory will grow", nil)
 	go func() {
+		chunk := make([]byte, 10*1024*1024)
+		for i := range chunk {
+			chunk[i] = byte(i % 256)
+		}
 		for {
 			app.mu.Lock()
-			// Allocate 10MB chunks
-			chunk := make([]byte, 10*1024*1024)
-			for i := range chunk {
-				chunk[i] = byte(i % 256)
-			}
 			app.memoryLeak = append(app.memoryLeak, chunk)
 			app.mu.Unlock()
 			app.log("warn", "Memory allocated", map[string]interface{}{
@@ -334,12 +333,12 @@ func (app *App) startBuggyCacheWarmup() {
 	})
 
 	go func() {
+		chunk := make([]byte, 10*1024*1024)
+		for i := range chunk {
+			chunk[i] = byte(i % 256)
+		}
 		for {
 			app.mu.Lock()
-			chunk := make([]byte, 10*1024*1024)
-			for i := range chunk {
-				chunk[i] = byte(i % 256)
-			}
 			app.memoryLeak = append(app.memoryLeak, chunk)
 			app.mu.Unlock()
 
