@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "payflow.backend.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.backend.replicaCount }}
   selector:
     matchLabels:
       {{- include "payflow.backend.selectorLabels" . | nindent 6 }}
