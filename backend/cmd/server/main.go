@@ -306,9 +306,14 @@ func (app *App) startOOMSimulation() {
 	}
 	app.log("warn", "OOM simulation enabled - memory will grow", nil)
 	go func() {
+		var maxChunks = 10
 		for {
 			app.mu.Lock()
-			// Allocate 10MB chunks
+			if len(app.memoryLeak) >= maxChunks {
+				app.mu.Unlock()
+				time.Sleep(5 * time.Second)
+				continue
+			}
 			chunk := make([]byte, 10*1024*1024)
 			for i := range chunk {
 				chunk[i] = byte(i % 256)
@@ -321,7 +326,7 @@ func (app *App) startOOMSimulation() {
 			})
 			time.Sleep(5 * time.Second)
 		}
-	}()
+	}() 
 }
 
 func (app *App) startBuggyCacheWarmup() {
@@ -334,8 +339,14 @@ func (app *App) startBuggyCacheWarmup() {
 	})
 
 	go func() {
+		var maxChunks = 10
 		for {
 			app.mu.Lock()
+			if len(app.memoryLeak) >= maxChunks {
+				app.mu.Unlock()
+				time.Sleep(5 * time.Second)
+				continue
+			}
 			chunk := make([]byte, 10*1024*1024)
 			for i := range chunk {
 				chunk[i] = byte(i % 256)
@@ -349,7 +360,7 @@ func (app *App) startBuggyCacheWarmup() {
 			})
 			time.Sleep(5 * time.Second)
 		}
-	}()
+	}() 
 }
 
 func (app *App) startCPUBurn() {
