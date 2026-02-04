@@ -306,20 +306,21 @@ func (app *App) startOOMSimulation() {
 	}
 	app.log("warn", "OOM simulation enabled - memory will grow", nil)
 	go func() {
-		for {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
 			app.mu.Lock()
-			// Allocate 10MB chunks
 			chunk := make([]byte, 10*1024*1024)
 			for i := range chunk {
 				chunk[i] = byte(i % 256)
 			}
 			app.memoryLeak = append(app.memoryLeak, chunk)
+			chunks := len(app.memoryLeak)
 			app.mu.Unlock()
 			app.log("warn", "Memory allocated", map[string]interface{}{
-				"chunks": len(app.memoryLeak),
-				"size_mb": len(app.memoryLeak) * 10,
+				"chunks":  chunks,
+				"size_mb": chunks * 10,
 			})
-			time.Sleep(5 * time.Second)
 		}
 	}()
 }
