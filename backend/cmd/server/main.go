@@ -306,9 +306,8 @@ func (app *App) startOOMSimulation() {
 	}
 	app.log("warn", "OOM simulation enabled - memory will grow", nil)
 	go func() {
-		for {
+		for i := 0; i < 50; i++ {
 			app.mu.Lock()
-			// Allocate 10MB chunks
 			chunk := make([]byte, 10*1024*1024)
 			for i := range chunk {
 				chunk[i] = byte(i % 256)
