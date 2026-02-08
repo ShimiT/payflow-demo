@@ -336,6 +336,9 @@ func (app *App) startBuggyCacheWarmup() {
 	go func() {
 		for {
 			app.mu.Lock()
+			if len(app.memoryLeak) >= 10 {
+				app.memoryLeak = app.memoryLeak[:0]
+			}
 			chunk := make([]byte, 10*1024*1024)
 			for i := range chunk {
 				chunk[i] = byte(i % 256)
