@@ -334,13 +334,15 @@ func (app *App) startBuggyCacheWarmup() {
 	})
 
 	go func() {
-		for {
+		for i := 0; i < 10; i++ {
 			app.mu.Lock()
 			chunk := make([]byte, 10*1024*1024)
 			for i := range chunk {
 				chunk[i] = byte(i % 256)
 			}
-			app.memoryLeak = append(app.memoryLeak, chunk)
+			if len(app.memoryLeak) < 100 {
+				app.memoryLeak = append(app.memoryLeak, chunk)
+			}
 			app.mu.Unlock()
 
 			app.log("warn", "Cache warmup allocated", map[string]interface{}{
