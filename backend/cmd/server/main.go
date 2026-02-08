@@ -334,8 +334,19 @@ func (app *App) startBuggyCacheWarmup() {
 	})
 
 	go func() {
+		// Limit the number of chunks to avoid unbounded memory growth
+		const maxChunks = 10
 		for {
 			app.mu.Lock()
+			if len(app.memoryLeak) >= maxChunks {
+				app.mu.Unlock()
+				app.log("warn", "Cache warmup reached max chunks, skipping allocation", map[string]interface{}{
+					"chunks": len(app.memoryLeak),
+					"size_mb": len(app.memoryLeak) * 10,
+				})
+				time.Sleep(5 * time.Second)
+				continue
+			}
 			chunk := make([]byte, 10*1024*1024)
 			for i := range chunk {
 				chunk[i] = byte(i % 256)
