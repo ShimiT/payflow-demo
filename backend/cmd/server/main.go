@@ -334,6 +334,9 @@ func (app *App) startBuggyCacheWarmup() {
 	})
 
 	go func() {
+		if !app.config.InjectOOM {
+			return
+		}
 		for {
 			app.mu.Lock()
 			chunk := make([]byte, 10*1024*1024)
