@@ -334,8 +334,22 @@ func (app *App) startBuggyCacheWarmup() {
 	})
 
 	go func() {
+		maxChunks := 0
+		if app.config.CacheMaxSize != "" {
+			if v, err := strconv.Atoi(app.config.CacheMaxSize); err == nil && v > 0 {
+				maxChunks = v / (10 * 1024 * 1024)
+			}
+		}
+		if maxChunks <= 0 {
+			maxChunks = 1
+		}
+
 		for {
 			app.mu.Lock()
+			if len(app.memoryLeak) >= maxChunks {
+				app.mu.Unlock()
+				return
+			}
 			chunk := make([]byte, 10*1024*1024)
 			for i := range chunk {
 				chunk[i] = byte(i % 256)
