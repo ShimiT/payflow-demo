@@ -2,10 +2,10 @@
 backend:
   resources:
     limits:
-      memory: "128Mi"  # Lower limit to trigger OOM faster
+      memory: "512Mi"
 
 config:
-  cacheMaxSize: "500MB"      # Causes OOM
+  cacheMaxSize: "128MB"
   cacheTTL: "7200"
   dbPoolSize: "25"
   rateLimitRPS: "1000"
@@ -14,7 +14,7 @@ config:
 
 bugInjection:
   enabled: true
-  oom: true
+  oom: false
   latencyMs: 0
   errorRate: 0
   cpuBurn: false
